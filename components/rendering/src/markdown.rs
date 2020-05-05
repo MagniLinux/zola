@@ -221,7 +221,7 @@ pub fn markdown_to_html(content: &str, context: &RenderContext) -> Result<Render
                         match kind {
                             CodeBlockKind::Indented => (),
                             CodeBlockKind::Fenced(info) => {
-                                highlighter = Some(get_highlighter(info, &context.config));
+                                highlighter = Some(get_highlighter(info.to_string().split_whitespace().next().unwrap(), &context.config));
                             }
                         };
                         // This selects the background color the same way that start_coloured_html_snippet does
@@ -231,7 +231,14 @@ pub fn markdown_to_html(content: &str, context: &RenderContext) -> Result<Render
                             .unwrap_or(::syntect::highlighting::Color::WHITE);
                         background = IncludeBackground::IfDifferent(color);
                         let snippet = start_highlighted_html_snippet(theme);
-                        Event::Html(snippet.0.into())
+                        let html= match kind {
+                            CodeBlockKind::Indented => snippet.0,
+                            CodeBlockKind::Fenced(info) => match info.to_string().split_whitespace().nth(1) {
+                                Some(path) => snippet.0.replace("pre", &(String::from("pre class=\"data-path\" data-file-path=\"") + path + "\"")),
+                                None => snippet.0
+                            }
+                        };
+                        Event::Html(html.into())
                     }
                     Event::End(Tag::CodeBlock(_)) => {
                         if !context.config.highlight_code {
@@ -269,6 +276,12 @@ pub fn markdown_to_html(content: &str, context: &RenderContext) -> Result<Render
                         };
 
                         Event::Start(Tag::Link(link_type, fixed_link.into(), title))
+                    }
+                    Event::Start(Tag::Table(_alignments)) => {
+                        Event::Html("<div class=\"table-container\"><table>".into())
+                    }
+                    Event::End(Tag::Table(_alignments)) => {
+                        Event::Html("</table></div>".into())
                     }
                     Event::Html(ref markup) if markup.contains("<!-- more -->") => {
                         has_summary = true;
@@ -329,6 +342,7 @@ pub fn markdown_to_html(content: &str, context: &RenderContext) -> Result<Render
                 };
                 let mut c = tera::Context::new();
                 c.insert("id", &id);
+                c.insert("level", &heading_ref.level);
 
                 let anchor_link = utils::templates::render_template(
                     &ANCHOR_LINK_TEMPLATE,

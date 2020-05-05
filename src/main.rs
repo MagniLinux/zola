@@ -111,6 +111,22 @@ fn main() {
                 }
             };
         }
+        ("index", Some(matches)) => {
+            console::info("Building search index...");
+            let start = Instant::now();
+            let output_dir = matches.value_of("output_dir").unwrap();
+            let show_drafts = matches.is_present("drafts");
+
+            let indexing_result = cmd::index( &root_dir, config_file, matches.value_of("base_url"), output_dir, show_drafts, matches.value_of("index_type").unwrap());
+
+            match indexing_result {
+                Ok(()) => console::report_elapsed_time(start),
+                Err(e) => {
+                    console::unravel_errors("Failed to build search index", &e);
+                    ::std::process::exit(1);
+                }
+            };
+        }
         _ => unreachable!(),
     }
 }
